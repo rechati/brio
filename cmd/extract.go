@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/rechati/brio/cmd/plugins"
+	"golang.design/x/clipboard"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -61,6 +63,14 @@ brio extract --categories "messages:foundation,tests" --dir ./ --files "*.py"
 // It defines flags for the extractCmd, allowing users to specify directory, file pattern, and categories to process.
 func init() {
 	// Register extractCmd as a subcommand of the rootCmd.
+
+	err := clipboard.Init()
+	if err != nil {
+		panic(err)
+	}
+
+	//clipboard.Write(clipboard.FmtText, []byte("text data"))
+
 	rootCmd.AddCommand(extractCmd)
 
 	// Get all supported extensions from plugins
@@ -425,18 +435,30 @@ func printSnippets(snips []snippet, clipboardMode bool) {
 
 	result := output.String()
 
-	// Always print to stdout
-	fmt.Print(result)
-
-	// If clipboard mode is active, also copy to clipboard
+	// TODO: Fix clipboard
 	if clipboardMode {
-		//if err := clipboard.WriteAll(result); err != nil {
-		//	fmt.Fprintf(os.Stderr, "Failed to copy to clipboard: %v\n", err)
-		//	return
-		//}
-		_, err := fmt.Fprintf(os.Stderr, "\nContent copied to clipboard!\n")
-		if err != nil {
-			return
-		}
+		// Write to clipboard
+		t := clipboard.FmtText
+		b := []byte(result)
+
+		changed := clipboard.Write(t, b)
+
+		// Wait for clipboard change event
+		fmt.Println("Output has been copied to the clipboard.")
+		waitForClipboardChange(changed)
+	} else {
+		fmt.Print(result)
+	}
+
+}
+
+func waitForClipboardChange(changed <-chan struct{}) {
+	select {
+	case <-changed:
+		// Print the message when the clipboard changes
+		fmt.Println(`"text data" is no longer available from clipboard.`)
+	case <-time.After(1 * time.Second):
+		// Timeout after 10 seconds to avoid indefinite waiting
+		fmt.Println("Timed out waiting for clipboard change.")
 	}
 }
