@@ -1,7 +1,7 @@
 package main
 
 import (
-	"brio/cmd"
+	"github.com/rechati/brio/cmd"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-module brio
+module github.com/rechati/brio
 
 go 1.23
 

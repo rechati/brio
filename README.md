@@ -23,7 +23,7 @@ Brio is a command-line tool for scanning your codebase and extracting code snipp
 1. **Clone the Repository** (or place the code in a folder):
 
 ```bash
-git clone https://github.com/your-username/brio.git
+git clone https://github.com/rechati/brio.git
 cd brio
 ```
 
