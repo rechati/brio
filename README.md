@@ -20,23 +20,10 @@ Brio is a command-line tool for scanning your codebase and extracting code snipp
 
 ## Installation
 
-1. **Clone the Repository** (or place the code in a folder):
+1. **CURL**
 
 ```bash
-git clone https://github.com/rechati/brio.git
-cd brio
-```
-
-2. **Build the CLI**:
-
-```bash
-go build -o brio
-```
-
-3. **(Optional) Move the Binary to Your PATH**:
-
-```bash
-mv brio /usr/local/bin
+curl -fsSL https://raw.githubusercontent.com/rechati/brio/main/install/install.sh | bash
 ```
 
 After this, you can run `brio` from any directory.
@@ -167,13 +154,7 @@ brio extract --files "*.go" --categories "foundation"
 2. **Merging Categories**  
    By default, Brio uses only the **start tag’s** categories, unless you modify the code to merge with the end tag’s JSON. If that is desirable, you can adjust the snippet creation logic.
 
-3. **Regex Adjustments**  
-   If your code comments differ (e.g., you prefer `// start:`), simply tweak the regex in `extract.go`.
-
-4. **Performance**  
-   For very large codebases, you can speed things up by adding concurrency when traversing files or reading lines. The current version processes files sequentially for simplicity.
-
-5. **Extending Output Formats**  
+3. **Extending Output Formats**  
    By default, snippets print in **Markdown**. You could add flags (`--format=json`, `--format=plain`, etc.) to integrate Brio with other tools or pipelines.
 
 ---
