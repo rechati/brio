@@ -26,3 +26,7 @@ func (p *TypeScriptPlugin) GetCommentStyle() CommentStyle {
 		},
 	}
 }
+
+func (p *TypeScriptPlugin) GetMarkdownIdentifier() string {
+	return "typescript"
+}

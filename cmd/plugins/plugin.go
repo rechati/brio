@@ -19,6 +19,7 @@ type Plugin interface {
 	GetExtensions() []string
 	// GetCommentStyle returns the comment style for this language
 	GetCommentStyle() CommentStyle
+	GetMarkdownIdentifier() string
 }
 
 // registry stores all available plugins

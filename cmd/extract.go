@@ -22,6 +22,7 @@ var (
 	dirFlag       string
 	filePattern   string
 	categoriesArg string
+	clipboardMode bool
 )
 
 // extractCmd defines a Cobra command for extracting code snippets based on specified categories in annotated files.
@@ -52,7 +53,7 @@ brio extract --categories "messages:foundation,tests" --dir ./ --files "*.py"
 		matchedSnippets := extractSnippets(files, catMap)
 
 		// 4. Print the results in Markdown (you can adapt to other formats).
-		printSnippetsMarkdown(matchedSnippets)
+		printSnippets(matchedSnippets, clipboardMode)
 	},
 }
 
@@ -74,6 +75,8 @@ func init() {
 		fmt.Sprintf("File pattern to match (e.g., *.py). %s", supportedExtsHelp))
 	extractCmd.Flags().StringVarP(&categoriesArg, "categories", "c", "",
 		"Categories to extract, e.g. 'messages:foundation,tests'")
+	extractCmd.Flags().BoolVarP(&clipboardMode, "clipboard", "v", false,
+		"Output in clipboard-friendly format (without Markdown)")
 }
 
 // parseCategoryArg parses a string argument with categories and domains into a map of categories to their associated domains.
@@ -282,6 +285,7 @@ type snippet struct {
 	EndLine    int
 	Categories map[string][]string
 	Content    []string
+	Plugin     plugins.Plugin
 }
 
 // snippetData represents a snippet of code extracted from a file, including its associated metadata and content lines.
@@ -338,6 +342,7 @@ func extractSnippets(files []string, catMap map[string][]string) []snippet {
 					EndLine:    lineNum,
 					Categories: activeSnippet.categories,
 					Content:    activeSnippet.lines,
+					Plugin:     plugin,
 				}
 
 				if snippetMatches(snippetObj, catMap) {
@@ -389,27 +394,49 @@ func snippetMatches(s snippet, catMap map[string][]string) bool {
 }
 
 // printSnippetsMarkdown prints a list of code snippets in Markdown format, including file name, line range, and categories.
-func printSnippetsMarkdown(snips []snippet) {
+func printSnippets(snips []snippet, clipboardMode bool) {
 	if len(snips) == 0 {
 		fmt.Println("No snippets found for the given categories.")
 		return
 	}
 
-	for _, s := range snips {
-		fmt.Printf("## File: %s (lines %d-%d)\n\n", s.File, s.StartLine, s.EndLine)
+	var output strings.Builder
 
-		// Display categories
+	for i, s := range snips {
+		// Add newline between snippets
+		if i > 0 {
+			output.WriteString("\n")
+		}
+
+		output.WriteString(fmt.Sprintf("## File: %s (lines %d-%d)\n\n", s.File, s.StartLine, s.EndLine))
+
 		catInfo := []string{}
 		for cat, domains := range s.Categories {
 			catInfo = append(catInfo, fmt.Sprintf(`%s -> %v`, cat, domains))
 		}
-		fmt.Printf("**Categories**: %s\n\n", strings.Join(catInfo, ", "))
+		output.WriteString(fmt.Sprintf("**Categories**: %s\n\n", strings.Join(catInfo, ", ")))
 
-		// Code block
-		fmt.Println("```python")
+		output.WriteString(fmt.Sprintf("```%s\n", s.Plugin.GetMarkdownIdentifier()))
 		for _, line := range s.Content {
-			fmt.Println(line)
+			output.WriteString(line + "\n")
 		}
-		fmt.Println("```")
+		output.WriteString("```\n")
+	}
+
+	result := output.String()
+
+	// Always print to stdout
+	fmt.Print(result)
+
+	// If clipboard mode is active, also copy to clipboard
+	if clipboardMode {
+		//if err := clipboard.WriteAll(result); err != nil {
+		//	fmt.Fprintf(os.Stderr, "Failed to copy to clipboard: %v\n", err)
+		//	return
+		//}
+		_, err := fmt.Fprintf(os.Stderr, "\nContent copied to clipboard!\n")
+		if err != nil {
+			return
+		}
 	}
 }

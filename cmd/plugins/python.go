@@ -26,3 +26,7 @@ func (p *PythonPlugin) GetCommentStyle() CommentStyle {
 		},
 	}
 }
+
+func (p *PythonPlugin) GetMarkdownIdentifier() string {
+	return "python"
+}
