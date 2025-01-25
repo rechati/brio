@@ -76,17 +76,17 @@ Examples of `--categories` usage:
 
 ## Annotation Format
 
-Brio looks for start and end comments formatted as follows:
+Brio looks for ">" and "<" comments formatted as follows:
 
 ```python
-# start: { "foundation": ["messages"], "model": ["messages"] }
+# >: { "foundation": ["messages"], "model": ["messages"] }
 < ... lines of code ... >
-# end: { "foundation": ["messages"] }
+# <: { "foundation": ["messages"] }
 ```
 
 #### Rules
 
-1. The `# start:` or `# end:` must be followed by a **JSON object** with the categories you want to associate with the snippet.
+1. The `# >:` or `# <:` must be followed by a **JSON object** with the categories you want to associate with the snippet.
 2. The snippet content is every line **between** the start and end tags.
 3. Categories are stored as key-value pairs (`key = category`, `value = array of domains`), for example `"foundation": ["messages"]`.
 4. Brio uses these categories to decide whether a snippet matches your CLI filter.
@@ -101,7 +101,7 @@ Brio looks for start and end comments formatted as follows:
 brio extract
 ```
 
-- Scans the current directory for `*.py` files by default.
+- Scans the current directory for supported files by default.
 - Prints all tagged snippets found.
 
 ### Extract Specific Categories
@@ -134,7 +134,7 @@ brio extract --categories "messages:foundation,tests"
 brio extract --dir /path/to/my/project --categories "foundation"
 ```
 
-- Recursively scans all subdirectories, matching `*.py`.
+- Recursively scans all subdirectories, matching supported plugins files extension.
 
 ### Specify File Pattern
 
@@ -149,7 +149,7 @@ brio extract --files "*.go" --categories "foundation"
 ## Advanced Tips
 
 1. **Nested Snippets**  
-   If you embed a `# start:` inside another snippet, Brio will treat them **separately**. Overlapping snippets can be tricky to parse, so consider carefully how you tag nested sections.
+   If you embed a `# >:` inside another snippet, Brio will treat them **separately**. Overlapping snippets can be tricky to parse, so consider carefully how you tag nested sections.
 
 2. **Merging Categories**  
    By default, Brio uses only the **start tag’s** categories, unless you modify the code to merge with the end tag’s JSON. If that is desirable, you can adjust the snippet creation logic.
