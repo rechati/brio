@@ -30,6 +30,14 @@ func TestParseCategoryArg(t *testing.T) {
 				"foundation": {""},
 			},
 		},
+		{
+			input: "messages:foundation,tests,additional",
+			expected: map[string][]string{
+				"foundation": {"messages"},
+				"tests":      {"messages"},
+				"additional": {"messages"},
+			},
+		},
 	}
 
 	for _, tc := range tests {

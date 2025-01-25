@@ -63,7 +63,7 @@ func init() {
 		"Categories to extract, e.g. 'messages:foundation,tests'")
 }
 
-// parseCategoryArg converts something like "messages:foundation,tests"
+// parseCategoryArg converts inputs like "messages:foundation,tests"
 // into a map of category -> [domains]. For instance:
 // "foundation": ["messages"], "tests": ["messages"].
 func parseCategoryArg(categoryArg string) map[string][]string {
@@ -71,21 +71,24 @@ func parseCategoryArg(categoryArg string) map[string][]string {
 	if categoryArg == "" {
 		return result
 	}
-	// Split by commas (and possibly spaces).
+
 	parts := strings.Split(categoryArg, ",")
+	var currentDomain string
+
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if strings.Contains(part, ":") {
-			// e.g. "messages:foundation"
+			// e.g., "messages:foundation"
 			splitPart := strings.SplitN(part, ":", 2)
-			domain := splitPart[0]
-			category := splitPart[1]
-			addToCategoryMap(result, category, domain)
+			currentDomain = strings.TrimSpace(splitPart[0])
+			category := strings.TrimSpace(splitPart[1])
+			addToCategoryMap(result, category, currentDomain)
 		} else {
-			// e.g. "tests" with no domain
-			addToCategoryMap(result, part, "")
+			// e.g., "tests" with inherited domain
+			addToCategoryMap(result, part, currentDomain)
 		}
 	}
+
 	return result
 }
 
@@ -101,6 +104,11 @@ func addToCategoryMap(catMap map[string][]string, category, domain string) {
 			}
 		}
 		catMap[category] = append(catMap[category], domain)
+	} else {
+		// If domain is empty string, ensure the slice contains an empty string
+		if len(catMap[category]) == 0 {
+			catMap[category] = append(catMap[category], "")
+		}
 	}
 }
 
