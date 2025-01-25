@@ -30,7 +30,3 @@ jobs:
           binary_name: "brio"
           extra_files: README.md
           goversion: "1.23.5"
-          pre_command: |
-            if [ "${{ matrix.goos }}" = "linux" ]; then
-              sudo apt-get update && sudo apt-get install -y libx11-dev;
-            fi

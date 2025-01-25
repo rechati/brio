@@ -6,13 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/rechati/brio/cmd/plugins"
-	"golang.design/x/clipboard"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -24,7 +22,6 @@ var (
 	dirFlag       string
 	filePattern   string
 	categoriesArg string
-	clipboardMode bool
 )
 
 // extractCmd defines a Cobra command for extracting code snippets based on specified categories in annotated files.
@@ -54,8 +51,7 @@ brio extract --categories "messages:foundation,tests" --dir ./ --files "*.py"
 		// 3. Extract snippets from those files that match the categories.
 		matchedSnippets := extractSnippets(files, catMap)
 
-		// 4. Print the results in Markdown (you can adapt to other formats).
-		printSnippets(matchedSnippets, clipboardMode)
+		printSnippets(matchedSnippets)
 	},
 }
 
@@ -63,14 +59,6 @@ brio extract --categories "messages:foundation,tests" --dir ./ --files "*.py"
 // It defines flags for the extractCmd, allowing users to specify directory, file pattern, and categories to process.
 func init() {
 	// Register extractCmd as a subcommand of the rootCmd.
-
-	err := clipboard.Init()
-	if err != nil {
-		panic(err)
-	}
-
-	//clipboard.Write(clipboard.FmtText, []byte("text data"))
-
 	rootCmd.AddCommand(extractCmd)
 
 	// Get all supported extensions from plugins
@@ -85,8 +73,6 @@ func init() {
 		fmt.Sprintf("File pattern to match (e.g., *.py). %s", supportedExtsHelp))
 	extractCmd.Flags().StringVarP(&categoriesArg, "categories", "c", "",
 		"Categories to extract, e.g. 'messages:foundation,tests'")
-	extractCmd.Flags().BoolVarP(&clipboardMode, "clipboard", "v", false,
-		"Output in clipboard-friendly format (without Markdown)")
 }
 
 // parseCategoryArg parses a string argument with categories and domains into a map of categories to their associated domains.
@@ -404,7 +390,7 @@ func snippetMatches(s snippet, catMap map[string][]string) bool {
 }
 
 // printSnippetsMarkdown prints a list of code snippets in Markdown format, including file name, line range, and categories.
-func printSnippets(snips []snippet, clipboardMode bool) {
+func printSnippets(snips []snippet) {
 	if len(snips) == 0 {
 		fmt.Println("No snippets found for the given categories.")
 		return
@@ -435,30 +421,5 @@ func printSnippets(snips []snippet, clipboardMode bool) {
 
 	result := output.String()
 
-	// TODO: Fix clipboard
-	if clipboardMode {
-		// Write to clipboard
-		t := clipboard.FmtText
-		b := []byte(result)
-
-		changed := clipboard.Write(t, b)
-
-		// Wait for clipboard change event
-		fmt.Println("Output has been copied to the clipboard.")
-		waitForClipboardChange(changed)
-	} else {
-		fmt.Print(result)
-	}
-
-}
-
-func waitForClipboardChange(changed <-chan struct{}) {
-	select {
-	case <-changed:
-		// Print the message when the clipboard changes
-		fmt.Println(`"text data" is no longer available from clipboard.`)
-	case <-time.After(1 * time.Second):
-		// Timeout after 10 seconds to avoid indefinite waiting
-		fmt.Println("Timed out waiting for clipboard change.")
-	}
+	fmt.Print(result)
 }
