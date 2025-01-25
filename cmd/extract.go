@@ -396,30 +396,26 @@ func printSnippets(snips []snippet) {
 		return
 	}
 
+	wd, wdErr := os.Getwd()
 	var output strings.Builder
 
-	for i, s := range snips {
-		// Add newline between snippets
-		if i > 0 {
-			output.WriteString("\n")
+	for _, s := range snips {
+		relativePath := s.File
+		// If we successfully retrieved the current directory,
+		// try converting the snippet’s path into a relative path
+		if wdErr == nil {
+			if rp, err := filepath.Rel(wd, s.File); err == nil {
+				relativePath = rp
+			}
 		}
 
-		output.WriteString(fmt.Sprintf("## File: %s (lines %d-%d)\n\n", s.File, s.StartLine, s.EndLine))
-
-		catInfo := []string{}
-		for cat, domains := range s.Categories {
-			catInfo = append(catInfo, fmt.Sprintf(`%s -> %v`, cat, domains))
-		}
-		output.WriteString(fmt.Sprintf("**Categories**: %s\n\n", strings.Join(catInfo, ", ")))
-
-		output.WriteString(fmt.Sprintf("```%s\n", s.Plugin.GetMarkdownIdentifier()))
+		output.WriteString(fmt.Sprintf("%s:\n", relativePath))
+		output.WriteString("```python\n")
 		for _, line := range s.Content {
 			output.WriteString(line + "\n")
 		}
-		output.WriteString("```\n")
+		output.WriteString("```\n\n")
 	}
 
-	result := output.String()
-
-	fmt.Print(result)
+	fmt.Print(output.String())
 }
