@@ -1,6 +1,8 @@
 # Brio: Code Snippet Extraction CLI
 
-Brio is a command-line tool for scanning your codebase and extracting code snippets that are annotated with special start/end tags containing JSON metadata. It’s especially useful when you want to share or debug code segments selectively without copying entire files manually.
+**Brio** is a simple but super handy command-line tool for pulling specific code snippets out of your codebase. It works by scanning your files for sections marked with special start/end tags that include JSON metadata. Instead of copying and pasting from entire files, you can just grab exactly what you need.
+
+Where Brio really shines is when you’re working with Large Language Models (LLMs) or trying to focus on specific parts of your code. Whether you’re building prompts, fine-tuning models, debugging, or just sharing snippets with your team, Brio makes it quick and painless. It’s like having a custom filter for your code that pulls out only what matters.
 
 ---
 
