@@ -201,6 +201,7 @@ type commentParser struct {
 	multiEndToken   *regexp.Regexp
 	inMultiline     bool
 	buffer          bytes.Buffer
+	foundStartTag   bool // Add this to track if we've found a start tag
 }
 
 func newCommentParser(p plugins.Plugin) *commentParser {
@@ -247,7 +248,7 @@ func (p *commentParser) parseLine(line string) (isStart bool, isEnd bool, jsonDa
 		p.buffer.WriteString(line + "\n")
 		if p.multiEndToken.MatchString(line) {
 			p.inMultiline = false
-			// Now process the entire multi-line comment
+			// Process the entire multi-line comment
 			fullComment := p.buffer.String()
 
 			// Look for >: {...} pattern in the full comment
@@ -255,6 +256,7 @@ func (p *commentParser) parseLine(line string) (isStart bool, isEnd bool, jsonDa
 			if startMatch != "" {
 				data, err := parseTagJSON(startMatch)
 				if err == nil {
+					p.foundStartTag = true
 					return true, false, data
 				}
 			}
@@ -345,7 +347,8 @@ func extractSnippets(files []string, catMap map[string][]string) []snippet {
 				continue
 			}
 
-			if activeSnippet != nil {
+			// Only collect lines if we have an active snippet
+			if activeSnippet != nil && !parser.inMultiline {
 				activeSnippet.lines = append(activeSnippet.lines, line)
 			}
 		}
