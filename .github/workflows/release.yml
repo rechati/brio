@@ -22,9 +22,6 @@ jobs:
             goos: darwin    # macOS doesn't support 32-bit
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies (Linux)
-        if: matrix.goos == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y libx11-dev
       - uses: wangyoucao577/go-release-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -33,3 +30,7 @@ jobs:
           binary_name: "brio"
           extra_files: README.md
           goversion: "1.23.5"
+          pre_command: |
+            if [ "${{ matrix.goos }}" = "linux" ]; then
+              sudo apt-get update && sudo apt-get install -y libx11-dev;
+            fi
