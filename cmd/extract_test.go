@@ -85,15 +85,15 @@ func TestExtractSnippets(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Test file content with two snippets
-	fileContent := `# start: {"foundation": ["messages"], "model": ["messages"]}
+	fileContent := `# >: {"foundation": ["messages"], "model": ["messages"]}
 class Message(TenantModel):
     pass
-# end: {"foundation": ["messages"]}
+# <: {"foundation": ["messages"]}
 
-# start: {"tests": ["messages"]}
+# >: {"tests": ["messages"]}
 def test_message():
     assert True
-# end: {"tests": ["messages"]}`
+# <: {"tests": ["messages"]}`
 
 	filePath := filepath.Join(tempDir, "test_snippets.py")
 	err := os.WriteFile(filePath, []byte(fileContent), 0644)

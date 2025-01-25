@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/rechati/brio/cmd/plugins"
 	"log"
 	"os"
 	"path/filepath"
@@ -60,9 +62,16 @@ func init() {
 	// Register extractCmd as a subcommand of the rootCmd.
 	rootCmd.AddCommand(extractCmd)
 
-	// Define local flags for this command only.
+	// Get all supported extensions from plugins
+	extensions := plugins.ListExtensions()
+	defaultPattern := "*" // Changed to accept all files, we'll filter by extension internally
+
+	// Create help text showing supported extensions
+	supportedExtsHelp := fmt.Sprintf("Supported extensions: %s", strings.Join(extensions, ", "))
+
 	extractCmd.Flags().StringVarP(&dirFlag, "dir", "d", ".", "Directory to scan")
-	extractCmd.Flags().StringVarP(&filePattern, "files", "f", "*.py", "File pattern to match (e.g. *.py)")
+	extractCmd.Flags().StringVarP(&filePattern, "files", "f", defaultPattern,
+		fmt.Sprintf("File pattern to match (e.g., *.py). %s", supportedExtsHelp))
 	extractCmd.Flags().StringVarP(&categoriesArg, "categories", "c", "",
 		"Categories to extract, e.g. 'messages:foundation,tests'")
 }
@@ -121,23 +130,48 @@ func addToCategoryMap(catMap map[string][]string, category, domain string) {
 // collectFiles scans the provided directory and returns a list of files matching the specified pattern.
 // dir is the root directory to start the search. pattern is the glob pattern for matching file names.
 // Returns a slice of matching file paths or an error if traversal fails.
+// cmd/extract.go
+
 func collectFiles(dir, pattern string) ([]string, error) {
 	var files []string
+
+	// Get all supported extensions from plugins
+	supportedExts := make(map[string]bool)
+	for _, ext := range plugins.ListExtensions() {
+		supportedExts[ext] = true
+	}
+
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() {
+
+		// Skip directories
+		if info.IsDir() {
+			return nil
+		}
+
+		// Check if file extension is supported
+		ext := filepath.Ext(path)
+		if !supportedExts[ext] {
+			return nil
+		}
+
+		// If pattern is provided, check if file matches pattern
+		if pattern != "" && pattern != "*" {
 			matched, err := filepath.Match(pattern, filepath.Base(path))
 			if err != nil {
 				return err
 			}
-			if matched {
-				files = append(files, path)
+			if !matched {
+				return nil
 			}
 		}
+
+		files = append(files, path)
 		return nil
 	})
+
 	return files, err
 }
 
@@ -157,6 +191,86 @@ func parseTagJSON(line string) (map[string][]string, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+type commentParser struct {
+	plugin          plugins.Plugin
+	startPattern    *regexp.Regexp
+	endPattern      *regexp.Regexp
+	multiStartToken *regexp.Regexp
+	multiEndToken   *regexp.Regexp
+	inMultiline     bool
+	buffer          bytes.Buffer
+}
+
+func newCommentParser(p plugins.Plugin) *commentParser {
+	style := p.GetCommentStyle()
+	return &commentParser{
+		plugin: p,
+		// Single line patterns remain the same
+		startPattern: regexp.MustCompile(
+			`(?i)` + regexp.QuoteMeta(style.Single) + `\s*>:\s*\{`,
+		),
+		endPattern: regexp.MustCompile(
+			`(?i)` + regexp.QuoteMeta(style.Single) + `\s*<:\s*\{`,
+		),
+		// Multi-line patterns now just match the comment tokens
+		multiStartToken: regexp.MustCompile(regexp.QuoteMeta(style.Multi.Start)),
+		multiEndToken:   regexp.MustCompile(regexp.QuoteMeta(style.Multi.End)),
+	}
+}
+
+func (p *commentParser) parseLine(line string) (isStart bool, isEnd bool, jsonData map[string][]string) {
+	// Check for single-line comments first
+	if p.startPattern.MatchString(line) {
+		data, err := parseTagJSON(line)
+		if err == nil {
+			return true, false, data
+		}
+	}
+	if p.endPattern.MatchString(line) {
+		data, err := parseTagJSON(line)
+		if err == nil {
+			return false, true, data
+		}
+	}
+
+	// Handle multi-line comments
+	if !p.inMultiline {
+		if p.multiStartToken.MatchString(line) {
+			p.inMultiline = true
+			p.buffer.Reset()
+			p.buffer.WriteString(line + "\n")
+			return false, false, nil
+		}
+	} else {
+		p.buffer.WriteString(line + "\n")
+		if p.multiEndToken.MatchString(line) {
+			p.inMultiline = false
+			// Now process the entire multi-line comment
+			fullComment := p.buffer.String()
+
+			// Look for >: {...} pattern in the full comment
+			startMatch := regexp.MustCompile(`>:\s*\{.*}`).FindString(fullComment)
+			if startMatch != "" {
+				data, err := parseTagJSON(startMatch)
+				if err == nil {
+					return true, false, data
+				}
+			}
+
+			// Look for <: {...} pattern in the full comment
+			endMatch := regexp.MustCompile(`<:\s*\{.*}`).FindString(fullComment)
+			if endMatch != "" {
+				data, err := parseTagJSON(endMatch)
+				if err == nil {
+					return false, true, data
+				}
+			}
+		}
+	}
+
+	return false, false, nil
 }
 
 // snippet represents a code snippet with its associated metadata including file path, line range, categories, and content.
@@ -180,11 +294,16 @@ type snippetData struct {
 func extractSnippets(files []string, catMap map[string][]string) []snippet {
 	var results []snippet
 
-	// Regexes for identifying lines that contain # start: / # end: plus JSON.
-	startPattern := regexp.MustCompile(`(?i)#\s*start:\s*\{`)
-	endPattern := regexp.MustCompile(`(?i)#\s*end:\s*\{`)
-
 	for _, filePath := range files {
+		ext := filepath.Ext(filePath)
+		plugin, ok := plugins.Get(ext)
+		if !ok {
+			log.Printf("No plugin found for file type: %s", filePath)
+			continue
+		}
+
+		parser := newCommentParser(plugin)
+
 		f, err := os.Open(filePath)
 		if err != nil {
 			log.Printf("Failed to open file %s: %v", filePath, err)
@@ -199,53 +318,38 @@ func extractSnippets(files []string, catMap map[string][]string) []snippet {
 			lineNum++
 			line := scanner.Text()
 
-			// Check for start line
-			if startPattern.MatchString(line) {
-				// If we already have an active snippet, forcibly close it or discard it.
-				activeSnippet = nil
+			isStart, isEnd, data := parser.parseLine(line)
 
-				tagData, err := parseTagJSON(line)
-				if err != nil {
-					continue
-				}
+			if isStart {
 				activeSnippet = &snippetData{
-					categories: tagData,
+					categories: data,
 					startLine:  lineNum,
 					lines:      []string{},
 				}
 				continue
 			}
 
-			// Check for end line
-			if endPattern.MatchString(line) {
-				if activeSnippet != nil {
-					_, _ = parseTagJSON(line)
-					// For simplicity, we won't merge endTagData with startTagData,
-					// but you could if both matter.
-
-					snippetObj := snippet{
-						File:       filePath,
-						StartLine:  activeSnippet.startLine,
-						EndLine:    lineNum,
-						Categories: activeSnippet.categories,
-						Content:    activeSnippet.lines,
-					}
-
-					// If snippet matches user-requested categories, add it to results
-					if snippetMatches(snippetObj, catMap) {
-						results = append(results, snippetObj)
-					}
-					activeSnippet = nil
+			if isEnd && activeSnippet != nil {
+				snippetObj := snippet{
+					File:       filePath,
+					StartLine:  activeSnippet.startLine,
+					EndLine:    lineNum,
+					Categories: activeSnippet.categories,
+					Content:    activeSnippet.lines,
 				}
+
+				if snippetMatches(snippetObj, catMap) {
+					results = append(results, snippetObj)
+				}
+				activeSnippet = nil
 				continue
 			}
 
-			// If we're inside a snippet, add the line to the snippet content
 			if activeSnippet != nil {
 				activeSnippet.lines = append(activeSnippet.lines, line)
 			}
 		}
-		_ = f.Close() // close file
+		_ = f.Close()
 	}
 
 	return results
