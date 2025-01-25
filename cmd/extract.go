@@ -13,14 +13,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// CLI flags for the extract command.
+// dirFlag specifies the directory path provided as a flag.
+// filePattern defines the pattern for matching file names.
+// categoriesArg holds the argument for specifying categories.
 var (
 	dirFlag       string
 	filePattern   string
 	categoriesArg string
 )
 
-// extractCmd represents the 'extract' subcommand
+// extractCmd defines a Cobra command for extracting code snippets based on specified categories in annotated files.
 var extractCmd = &cobra.Command{
 	Use:   "extract",
 	Short: "Extract code snippets by specified categories",
@@ -52,6 +54,8 @@ brio extract --categories "messages:foundation,tests" --dir ./ --files "*.py"
 	},
 }
 
+// init initializes the command-line interface by adding the extractCmd as a subcommand to rootCmd.
+// It defines flags for the extractCmd, allowing users to specify directory, file pattern, and categories to process.
 func init() {
 	// Register extractCmd as a subcommand of the rootCmd.
 	rootCmd.AddCommand(extractCmd)
@@ -63,9 +67,7 @@ func init() {
 		"Categories to extract, e.g. 'messages:foundation,tests'")
 }
 
-// parseCategoryArg converts inputs like "messages:foundation,tests"
-// into a map of category -> [domains]. For instance:
-// "foundation": ["messages"], "tests": ["messages"].
+// parseCategoryArg parses a string argument with categories and domains into a map of categories to their associated domains.
 func parseCategoryArg(categoryArg string) map[string][]string {
 	result := make(map[string][]string)
 	if categoryArg == "" {
@@ -92,6 +94,10 @@ func parseCategoryArg(categoryArg string) map[string][]string {
 	return result
 }
 
+// addToCategoryMap adds a domain to the specified category in the map.
+// If the category does not exist, it initializes it with an empty slice.
+// Prevents duplicate domains within a category.
+// Ensures the slice contains an empty string if the domain is an empty string and the category is new.
 func addToCategoryMap(catMap map[string][]string, category, domain string) {
 	if _, exists := catMap[category]; !exists {
 		catMap[category] = []string{}
@@ -112,8 +118,9 @@ func addToCategoryMap(catMap map[string][]string, category, domain string) {
 	}
 }
 
-// collectFiles recursively walks the directory, returning files
-// that match the filePattern (e.g., "*.py").
+// collectFiles scans the provided directory and returns a list of files matching the specified pattern.
+// dir is the root directory to start the search. pattern is the glob pattern for matching file names.
+// Returns a slice of matching file paths or an error if traversal fails.
 func collectFiles(dir, pattern string) ([]string, error) {
 	var files []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -134,8 +141,8 @@ func collectFiles(dir, pattern string) ([]string, error) {
 	return files, err
 }
 
-// parseTagJSON extracts the JSON portion from a line like:
-// # start: {"foundation": ["messages"]} or # end: {"foundation": ["messages"]}.
+// parseTagJSON extracts JSON data from a line of text and parses it into a map of string slices.
+// Returns an error if JSON parsing fails or no JSON is found.
 func parseTagJSON(line string) (map[string][]string, error) {
 	startIdx := strings.Index(line, "{")
 	endIdx := strings.LastIndex(line, "}")
@@ -152,7 +159,7 @@ func parseTagJSON(line string) (map[string][]string, error) {
 	return data, nil
 }
 
-// snippet stores a code snippet plus metadata about its origin.
+// snippet represents a code snippet with its associated metadata including file path, line range, categories, and content.
 type snippet struct {
 	File       string
 	StartLine  int
@@ -161,16 +168,15 @@ type snippet struct {
 	Content    []string
 }
 
-// snippetData is used internally while scanning a single file
-// to accumulate lines between # start: and # end: tags.
+// snippetData represents a snippet of code extracted from a file, including its associated metadata and content lines.
 type snippetData struct {
 	categories map[string][]string
 	startLine  int
 	lines      []string
 }
 
-// extractSnippets scans each file line by line, looking for
-// # start: { ... } or # end: { ... }, then capturing the code in between.
+// extractSnippets scans a list of files for code snippets annotated with start and end tags containing category metadata.
+// It extracts the matching snippets based on the provided category map and returns them as a slice of snippet objects.
 func extractSnippets(files []string, catMap map[string][]string) []snippet {
 	var results []snippet
 
@@ -245,8 +251,9 @@ func extractSnippets(files []string, catMap map[string][]string) []snippet {
 	return results
 }
 
-// snippetMatches checks if at least one of the snippet's category->domain pairs
-// intersects with what the user has requested in catMap.
+// snippetMatches checks if a snippet matches the requested category-domain mapping specified in catMap.
+// If catMap is empty, the function returns true, indicating all snippets should match.
+// The function iterates through the snippet's categories and checks for intersections with the requested domains in catMap.
 func snippetMatches(s snippet, catMap map[string][]string) bool {
 	// If user specified no categories, everything matches.
 	if len(catMap) == 0 {
@@ -274,7 +281,7 @@ func snippetMatches(s snippet, catMap map[string][]string) bool {
 	return false
 }
 
-// printSnippetsMarkdown prints matched snippets in a Markdown-friendly way.
+// printSnippetsMarkdown prints a list of code snippets in Markdown format, including file name, line range, and categories.
 func printSnippetsMarkdown(snips []snippet) {
 	if len(snips) == 0 {
 		fmt.Println("No snippets found for the given categories.")
